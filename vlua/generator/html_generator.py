@@ -1,157 +1,361 @@
-from antlr4 import *
-from vlua.parser.LuaParser import LuaParser
-from vlua.parser.LuaVisitor import LuaVisitor
+from luaparser.astnodes import *
+from luaparser.utils.visitor import *
+from dominate.tags import *
 
 def generate_html(ast):
     visitor = HtmlGenerator()
-    return visitor.visit(ast)
+    return visitor.visit(ast).render()
 
-class HtmlGenerator(LuaVisitor):
+class HtmlGenerator:
 
-    # Visit a parse tree produced by LuaParser#chunk.
-    def visitChunk(self, ctx:LuaParser.ChunkContext):
-        return self.visitChildren(ctx)
+    @visitor(Chunk)
+    def visit(self, node) -> html_tag:
+        return div(self.visit(node.body), _class='chunk')
 
-    # Visit a parse tree produced by LuaParser#block.
-    def visitBlock(self, ctx:LuaParser.BlockContext):
-        return self.visitChildren(ctx)
+    @visitor(Block)
+    def visit(self, node: Block) -> html_tag:
+        return div(
+            *[div(self.visit(statement), _class='statement') for statement in node.body],
+            _class='block'
+        )
 
-    # Visit a parse tree produced by LuaParser#stat.
-    def visitStat(self, ctx:LuaParser.StatContext):
-        return self.visitChildren(ctx)
+    @visitor(Assign)
+    def visit(self, node: Assign) -> html_tag:
+        return div(
+            self.visit(node.targets),
+            ' = ',
+            self.visit(node.values),
+            _class='assignment'
+        )
 
-    # Visit a parse tree produced by LuaParser#attnamelist.
-    def visitAttnamelist(self, ctx:LuaParser.AttnamelistContext):
-        return self.visitChildren(ctx)
+    @visitor(LocalAssign)
+    def visit(self, node: LocalAssign) -> html_tag:
+        return "local " + self.visit(node.targets) + " = " + self.visit(node.values)
 
-    # Visit a parse tree produced by LuaParser#attrib.
-    def visitAttrib(self, ctx:LuaParser.AttribContext):
-        return self.visitChildren(ctx)
+    @visitor(While)
+    def visit(self, node: While) -> html_tag:
+        return (
+            "while " + self.visit(node.test) + " do\n" + self.visit(node.body) + "\nend"
+        )
 
-    # Visit a parse tree produced by LuaParser#laststat.
-    def visitLaststat(self, ctx:LuaParser.LaststatContext):
-        return self.visitChildren(ctx)
+    @visitor(Do)
+    def visit(self, node: Do) -> html_tag:
+        return "do\n" + self.visit(node.body) + "\nend"
 
-    # Visit a parse tree produced by LuaParser#label.
-    def visitLabel(self, ctx:LuaParser.LabelContext):
-        return self.visitChildren(ctx)
+    @visitor(If)
+    def visit(self, node: If) -> html_tag:
+        output = (
+            "if " + self.visit(node.test) + " then\n" + self.visit(node.body)
+        )
+        if isinstance(node.orelse, ElseIf):
+            output += "\n" + self.visit(node.orelse)
+        elif node.orelse:
+            output += "\nelse\n" + self.visit(node.orelse)
+        output += "\nend"
+        return output
 
-    # Visit a parse tree produced by LuaParser#funcname.
-    def visitFuncname(self, ctx:LuaParser.FuncnameContext):
-        return self.visitChildren(ctx)
+    @visitor(ElseIf)
+    def visit(self, node: ElseIf) -> html_tag:
+        output = (
+            "elseif " + self.visit(node.test) + " then\n" + self.visit(node.body)
+        )
+        if isinstance(node.orelse, ElseIf):
+            output += "\n" + self.visit(node.orelse)
+        elif node.orelse:
+            output += "\nelse\n" + self.visit(node.orelse)
+        return output
 
-    # Visit a parse tree produced by LuaParser#varlist.
-    def visitVarlist(self, ctx:LuaParser.VarlistContext):
-        return self.visitChildren(ctx)
+    @visitor(Label)
+    def visit(self, node: Label) -> html_tag:
+        return "::" + self.visit(node.id) + "::"
 
-    # Visit a parse tree produced by LuaParser#namelist.
-    def visitNamelist(self, ctx:LuaParser.NamelistContext):
-        return self.visitChildren(ctx)
+    @visitor(Goto)
+    def visit(self, node: Goto) -> html_tag:
+        return "goto " + self.visit(node.label)
 
-    # Visit a parse tree produced by LuaParser#explist.
-    def visitExplist(self, ctx:LuaParser.ExplistContext):
-        return self.visitChildren(ctx)
+    @visitor(Break)
+    def visit(self, node: Break) -> html_tag:
+        return "break"
 
-    # Visit a parse tree produced by LuaParser#exp.
-    def visitExp(self, ctx:LuaParser.ExpContext):
-        return self.visitChildren(ctx)
+    @visitor(Return)
+    def visit(self, node: Return) -> html_tag:
+        return "return " + self.visit(node.values)
 
-    # Visit a parse tree produced by LuaParser#prefixexp.
-    def visitPrefixexp(self, ctx:LuaParser.PrefixexpContext):
-        return self.visitChildren(ctx)
+    @visitor(Fornum)
+    def visit(self, node: Fornum) -> html_tag:
+        output = " ".join(
+            [
+                "for",
+                self.visit(node.target),
+                "=",
+                ", ".join([self.visit(node.start), self.visit(node.stop)]),
+            ]
+        )
+        if node.step != 1:
+            output += ", " + self.visit(node.step)
+        output += " do\n" + self.visit(node.body) + "\nend"
+        return output
 
-    # Visit a parse tree produced by LuaParser#functioncall.
-    def visitFunctioncall(self, ctx:LuaParser.FunctioncallContext):
-        return self.visitChildren(ctx)
+    @visitor(Forin)
+    def visit(self, node: Forin) -> html_tag:
+        return (
+            " ".join(
+                ["for", self.visit(node.targets), "in", self.visit(node.iter), "do"]
+            )
+            + "\n"
+            + self.visit(node.body)
+            + "\nend"
+        )
 
-    # Visit a parse tree produced by LuaParser#varOrExp.
-    def visitVarOrExp(self, ctx:LuaParser.VarOrExpContext):
-        return self.visitChildren(ctx)
+    @visitor(Call)
+    def visit(self, node: Call) -> html_tag:
+        return self.visit(node.func) + "(" + self.visit(node.args) + ")"
 
-    # Visit a parse tree produced by LuaParser#var.
-    def visitVar(self, ctx:LuaParser.VarContext):
-        return self.visitChildren(ctx)
+    @visitor(Invoke)
+    def visit(self, node: Invoke) -> html_tag:
+        return (
+            self.visit(node.source)
+            + ":"
+            + self.visit(node.func)
+            + "("
+            + self.visit(node.args)
+            + ")"
+        )
 
-    # Visit a parse tree produced by LuaParser#varSuffix.
-    def visitVarSuffix(self, ctx:LuaParser.VarSuffixContext):
-        return self.visitChildren(ctx)
+    @visitor(Function)
+    def visit(self, node: Function) -> html_tag:
+        return (
+            "function "
+            + self.visit(node.name)
+            + "("
+            + self.visit(node.args)
+            + ")\n"
+            + self.visit(node.body)
+            + "\nend"
+        )
 
-    # Visit a parse tree produced by LuaParser#nameAndArgs.
-    def visitNameAndArgs(self, ctx:LuaParser.NameAndArgsContext):
-        return self.visitChildren(ctx)
+    @visitor(LocalFunction)
+    def visit(self, node) -> html_tag:
+        return (
+            "local function "
+            + self.visit(node.name)
+            + "("
+            + self.visit(node.args)
+            + ")\n"
+            + self.visit(node.body)
+            + "\nend"
+        )
 
-    # Visit a parse tree produced by LuaParser#args.
-    def visitArgs(self, ctx:LuaParser.ArgsContext):
-        return self.visitChildren(ctx)
+    @visitor(Method)
+    def visit(self, node: Method) -> html_tag:
+        return (
+            "function "
+            + self.visit(node.source)
+            + ":"
+            + self.visit(node.name)
+            + "("
+            + self.visit(node.args)
+            + ")\n"
+            + self.visit(node.body)
+            + "\nend"
+        )
 
-    # Visit a parse tree produced by LuaParser#functiondef.
-    def visitFunctiondef(self, ctx:LuaParser.FunctiondefContext):
-        return self.visitChildren(ctx)
+    @visitor(Nil)
+    def visit(self, node) -> html_tag:
+        return "nil"
 
-    # Visit a parse tree produced by LuaParser#funcbody.
-    def visitFuncbody(self, ctx:LuaParser.FuncbodyContext):
-        return self.visitChildren(ctx)
+    @visitor(TrueExpr)
+    def visit(self, node) -> html_tag:
+        return span("true", _class='boolean')
 
-    # Visit a parse tree produced by LuaParser#parlist.
-    def visitParlist(self, ctx:LuaParser.ParlistContext):
-        return self.visitChildren(ctx)
+    @visitor(FalseExpr)
+    def visit(self, node) -> html_tag:
+        return span("false", _class='boolean')
 
-    # Visit a parse tree produced by LuaParser#tableconstructor.
-    def visitTableconstructor(self, ctx:LuaParser.TableconstructorContext):
-        return self.visitChildren(ctx)
+    @visitor(Number)
+    def visit(self, node) -> html_tag:
+        return self.visit(node.n)
 
-    # Visit a parse tree produced by LuaParser#fieldlist.
-    def visitFieldlist(self, ctx:LuaParser.FieldlistContext):
-        return self.visitChildren(ctx)
+    @visitor(String)
+    def visit(self, node: String) -> html_tag:
+        if node.delimiter == StringDelimiter.SINGLE_QUOTE:
+            return "'" + self.visit(node.s) + "'"
+        elif node.delimiter == StringDelimiter.DOUBLE_QUOTE:
+            return '"' + self.visit(node.s) + '"'
+        else:
+            return "[[" + self.visit(node.s) + "]]"
 
-    # Visit a parse tree produced by LuaParser#field.
-    def visitField(self, ctx:LuaParser.FieldContext):
-        return self.visitChildren(ctx)
+    @visitor(Table)
+    def visit(self, node: Table):
+        output = "{\n"
+        for field in node.fields:
+            output += indent(self.visit(field) + ",\n", " " * self._indent_size)
+        output += "}"
+        return output
 
-    # Visit a parse tree produced by LuaParser#fieldsep.
-    def visitFieldsep(self, ctx:LuaParser.FieldsepContext):
-        return self.visitChildren(ctx)
+    @visitor(Field)
+    def visit(self, node: Field):
+        output = "[" if node.between_brackets else ""
+        output += self.visit(node.key)
+        output += "]" if node.between_brackets else ""
+        output += " = "
+        output += self.visit(node.value)
+        return output
 
-    # Visit a parse tree produced by LuaParser#operatorOr.
-    def visitOperatorOr(self, ctx:LuaParser.OperatorOrContext):
-        return self.visitChildren(ctx)
+    @visitor(Dots)
+    def visit(self, node) -> html_tag:
+        return "..."
 
-    # Visit a parse tree produced by LuaParser#operatorAnd.
-    def visitOperatorAnd(self, ctx:LuaParser.OperatorAndContext):
-        return self.visitChildren(ctx)
+    @visitor(AnonymousFunction)
+    def visit(self, node: AnonymousFunction) -> html_tag:
+        return (
+            "function("
+            + self.visit(node.args)
+            + ")\n"
+            + self.visit(node.body)
+            + "\nend"
+        )
 
-    # Visit a parse tree produced by LuaParser#operatorComparison.
-    def visitOperatorComparison(self, ctx:LuaParser.OperatorComparisonContext):
-        return self.visitChildren(ctx)
+    @visitor(AddOp)
+    def visit(self, node) -> html_tag:
+        return self.visit(node.left) + " + " + self.visit(node.right)
 
-    # Visit a parse tree produced by LuaParser#operatorStrcat.
-    def visitOperatorStrcat(self, ctx:LuaParser.OperatorStrcatContext):
-        return self.visitChildren(ctx)
+    @visitor(SubOp)
+    def visit(self, node) -> html_tag:
+        return self.visit(node.left) + " - " + self.visit(node.right)
 
-    # Visit a parse tree produced by LuaParser#operatorAddSub.
-    def visitOperatorAddSub(self, ctx:LuaParser.OperatorAddSubContext):
-        return self.visitChildren(ctx)
+    @visitor(MultOp)
+    def visit(self, node) -> html_tag:
+        return self.visit(node.left) + " * " + self.visit(node.right)
 
-    # Visit a parse tree produced by LuaParser#operatorMulDivMod.
-    def visitOperatorMulDivMod(self, ctx:LuaParser.OperatorMulDivModContext):
-        return self.visitChildren(ctx)
+    @visitor(FloatDivOp)
+    def visit(self, node) -> html_tag:
+        return self.visit(node.left) + " / " + self.visit(node.right)
 
-    # Visit a parse tree produced by LuaParser#operatorBitwise.
-    def visitOperatorBitwise(self, ctx:LuaParser.OperatorBitwiseContext):
-        return self.visitChildren(ctx)
+    @visitor(FloorDivOp)
+    def visit(self, node) -> html_tag:
+        return self.visit(node.left) + " // " + self.visit(node.right)
 
-    # Visit a parse tree produced by LuaParser#operatorUnary.
-    def visitOperatorUnary(self, ctx:LuaParser.OperatorUnaryContext):
-        return self.visitChildren(ctx)
+    @visitor(ModOp)
+    def visit(self, node) -> html_tag:
+        return self.visit(node.left) + " % " + self.visit(node.right)
 
-    # Visit a parse tree produced by LuaParser#operatorPower.
-    def visitOperatorPower(self, ctx:LuaParser.OperatorPowerContext):
-        return self.visitChildren(ctx)
+    @visitor(ExpoOp)
+    def visit(self, node) -> html_tag:
+        return self.visit(node.left) + " ^ " + self.visit(node.right)
 
-    # Visit a parse tree produced by LuaParser#number.
-    def visitNumber(self, ctx:LuaParser.NumberContext):
-        return self.visitChildren(ctx)
+    @visitor(BAndOp)
+    def visit(self, node) -> html_tag:
+        return self.visit(node.left) + " & " + self.visit(node.right)
 
-    # Visit a parse tree produced by LuaParser#string.
-    def visitString(self, ctx:LuaParser.StringContext):
-        return self.visitChildren(ctx)
+    @visitor(BOrOp)
+    def visit(self, node) -> html_tag:
+        return self.visit(node.left) + " | " + self.visit(node.right)
+
+    @visitor(BXorOp)
+    def visit(self, node) -> html_tag:
+        return self.visit(node.left) + " ~ " + self.visit(node.right)
+
+    @visitor(BShiftROp)
+    def visit(self, node) -> html_tag:
+        return self.visit(node.left) + " >> " + self.visit(node.right)
+
+    @visitor(BShiftLOp)
+    def visit(self, node) -> html_tag:
+        return self.visit(node.left) + " << " + self.visit(node.right)
+
+    @visitor(LessThanOp)
+    def visit(self, node) -> html_tag:
+        return self.visit(node.left) + " < " + self.visit(node.right)
+
+    @visitor(GreaterThanOp)
+    def visit(self, node) -> html_tag:
+        return self.visit(node.left) + " > " + self.visit(node.right)
+
+    @visitor(LessOrEqThanOp)
+    def visit(self, node) -> html_tag:
+        return self.visit(node.left) + " <= " + self.visit(node.right)
+
+    @visitor(GreaterOrEqThanOp)
+    def visit(self, node) -> html_tag:
+        return self.visit(node.left) + " >= " + self.visit(node.right)
+
+    @visitor(EqToOp)
+    def visit(self, node) -> html_tag:
+        return self.visit(node.left) + " == " + self.visit(node.right)
+
+    @visitor(NotEqToOp)
+    def visit(self, node) -> html_tag:
+        return self.visit(node.left) + " ~= " + self.visit(node.right)
+
+    @visitor(AndLoOp)
+    def visit(self, node) -> html_tag:
+        return self.visit(node.left) + " and " + self.visit(node.right)
+
+    @visitor(OrLoOp)
+    def visit(self, node) -> html_tag:
+        return self.visit(node.left) + " or " + self.visit(node.right)
+
+    @visitor(Concat)
+    def visit(self, node) -> html_tag:
+        return self.visit(node.left) + ".." + self.visit(node.right)
+
+    @visitor(UMinusOp)
+    def visit(self, node) -> html_tag:
+        return "-" + self.visit(node.operand)
+
+    @visitor(UBNotOp)
+    def visit(self, node) -> html_tag:
+        return "~" + self.visit(node.operand)
+
+    @visitor(ULNotOp)
+    def visit(self, node) -> html_tag:
+        return "not " + self.visit(node.operand)
+
+    @visitor(ULengthOP)
+    def visit(self, node) -> html_tag:
+        return "#" + self.visit(node.operand)
+
+    @visitor(Name)
+    def visit(self, node: Name) -> html_tag:
+        return span(str(node.id), _class='name')
+
+    @visitor(Index)
+    def visit(self, node: Index) -> html_tag:
+        if node.notation == IndexNotation.DOT:
+            return self.visit(node.value) + "." + self.visit(node.idx)
+        else:
+            return self.visit(node.value) + "[" + self.visit(node.idx) + "]"
+
+    @visitor(Varargs)
+    def visit(self, node) -> html_tag:
+        return span("...", _class='variable-args')
+
+    @visitor(Repeat)
+    def visit(self, node: Repeat) -> html_tag:
+        return "repeat\n" + self.visit(node.body) + "\nuntil " + self.visit(node.test)
+
+    @visitor(SemiColon)
+    def visit(self, node) -> html_tag:
+        return span(";", _class='semicolon')
+    
+    # Convert Python data types to strings
+    @visitor(str)
+    def visit(self, node) -> str:
+        return str(node)
+
+    @visitor(float)
+    def visit(self, node) -> str:
+        return str(node)
+
+    @visitor(int)
+    def visit(self, node) -> str:
+        return str(node)
+
+    @visitor(list)
+    def visit(self, node: List) -> html_tag:
+        return div(*[self.visit(n) for n in node], _clas='list')
+
+    @visitor(type(None))
+    def visit(self, node) -> str:
+        return ''

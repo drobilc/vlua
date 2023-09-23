@@ -1,2 +1,2 @@
-antlr4-tools==0.2
-antlr4-python3-runtime==4.13.0
+luaparser==3.2.1
+dominate==2.8.0

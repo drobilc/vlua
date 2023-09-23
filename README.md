@@ -9,9 +9,6 @@ To install, make sure that you are using at least **Python 3.6**.
 ```bash
 # Install project requirements
 pip install -r requirements.txt
-
-# Build Antlr4 grammar
-antlr4 -v 4.13.0 -Dlanguage=Python3 vlua/parser/Lua.g4 -visitor
 ```
 
 ## Usage

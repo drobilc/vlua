@@ -1,10 +1,6 @@
-from antlr4 import *
-from .LuaLexer import LuaLexer
-from .LuaParser import LuaParser
+from luaparser import ast
 
 def parse(path):
-    input_stream = FileStream(path)
-    lexer = LuaLexer(input_stream)
-    stream = CommonTokenStream(lexer)
-    parser = LuaParser(stream)
-    return parser.chunk()
+    with open(path, 'r') as input_file:
+        content = input_file.read()
+        return ast.parse(content)

@@ -1,0 +1,69 @@
+header {
+  background-color: lightgoldenrodyellow;
+}
+article {
+  background-color: lightskyblue;
+	padding: 0.4em;
+}
+div {
+  padding: 0.4em;
+  /*display:flex;*/
+  border: solid 0.0em #ffffff99;
+}
+div.header {	
+	display: block;
+}
+/*
+span.return::before {
+	content:"return "
+} */ 
+span {
+	background-color:#ff31;
+}
+
+.if {
+	background-color:lightgreen;
+}
+.ElseIf {
+	background-color: lightpink;
+}
+.else {
+	background-color:lightcoral;
+}
+body {
+}
+ol,ul {
+	display: inline;
+}
+.method {
+	background-color: lightsteelblue;
+}
+section{
+	padding: 0.4em;
+}
+.assignment, .anonymousfunction {
+	display: flex;
+}
+
+.return .break {
+	color: darkred;
+}
+.statement {
+	display: block;
+}
+.call {
+	color: darkgreen;
+}
+tr:nth-child(odd) {
+	background: #f2f2f2;
+}
+ol, ul, li{
+  display: inline;
+	padding: 0;
+	margin: 0;
+}
+li:not(:last-child)::after { content: ", ";}
+
+var {
+	color: darkgoldenrod;
+}

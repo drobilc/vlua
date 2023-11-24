@@ -18,3 +18,8 @@ To use, pass the path to the input Lua file as first argument and the output fil
 ```bash
 python vlua.py examples/factorial.lua --output-file factorial.html
 ```
+or for a bigger lua source file:
+```bash
+python vlua.py examples/transform.lua --output-file transform.html
+```
+The generated HTML will link to `style.css` and apply that style when openend in a browser. 

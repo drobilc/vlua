@@ -10,18 +10,21 @@ class HtmlGenerator:
 
     @visitor(Chunk)
     def visit(self, node) -> html_tag:
-        return div(self.visit(node.body), _class='chunk')
+        return html(
+            head(link(_rel="stylesheet", _href="style.css")),
+            body(self.visit(node.body))
+        )
 
     @visitor(Block)
     def visit(self, node: Block) -> html_tag:
-        return div(
-            *[div(self.visit(statement), _class='statement') for statement in node.body],
+        return span(
+            *[span(self.visit(statement), _class='statement') for statement in node.body],
             _class='block'
         )
 
     @visitor(Assign)
     def visit(self, node: Assign) -> html_tag:
-        return div(
+        return span(
             self.visit(node.targets),
             ' = ',
             self.visit(node.values),
@@ -30,147 +33,135 @@ class HtmlGenerator:
 
     @visitor(LocalAssign)
     def visit(self, node: LocalAssign) -> html_tag:
-        return "local " + self.visit(node.targets) + " = " + self.visit(node.values)
+        return span(
+		      strong("local "),
+		      self.visit(node.targets),
+		      " = ",
+		      self.visit(node.values)
+				)
 
     @visitor(While)
     def visit(self, node: While) -> html_tag:
-        return (
-            "while " + self.visit(node.test) + " do\n" + self.visit(node.body) + "\nend"
+        return div(
+            header(strong("while "), self.visit(node.test), strong(" do")),
+            self.visit(node.body)
         )
 
     @visitor(Do)
     def visit(self, node: Do) -> html_tag:
-        return "do\n" + self.visit(node.body) + "\nend"
+        return div(strong("do "), self.visit(node.body), _class="do")
 
     @visitor(If)
     def visit(self, node: If) -> html_tag:
-        output = (
-            "if " + self.visit(node.test) + " then\n" + self.visit(node.body)
+        output = div(
+            header(strong("if" ), self.visit(node.test)),
+            self.visit(node.body), 
+            _class="if"
         )
         if isinstance(node.orelse, ElseIf):
-            output += "\n" + self.visit(node.orelse)
+            output += div(self.visit(node.orelse), _class="ElseIf")
         elif node.orelse:
-            output += "\nelse\n" + self.visit(node.orelse)
-        output += "\nend"
+            output += div(strong("else "), self.visit(node.orelse), _class="else")
         return output
 
     @visitor(ElseIf)
     def visit(self, node: ElseIf) -> html_tag:
-        output = (
-            "elseif " + self.visit(node.test) + " then\n" + self.visit(node.body)
+        output = div(
+             header(strong("elif"), self.visit(node.test)),
+             self.visit(node.body), 
+             _class="elseif"
         )
         if isinstance(node.orelse, ElseIf):
-            output += "\n" + self.visit(node.orelse)
+            output += div(self.visit(node.orelse), _class="ElseIf")
         elif node.orelse:
-            output += "\nelse\n" + self.visit(node.orelse)
+            output +=  div(strong("else "), self.visit(node.orelse), _class="else")
         return output
 
     @visitor(Label)
     def visit(self, node: Label) -> html_tag:
-        return "::" + self.visit(node.id) + "::"
+        return span("::", self.visit(node.id), "::")
 
     @visitor(Goto)
     def visit(self, node: Goto) -> html_tag:
-        return "goto " + self.visit(node.label)
+        return span(strong("goto "), self.visit(node.label))
 
     @visitor(Break)
     def visit(self, node: Break) -> html_tag:
-        return "break"
+        return strong("break", _class="break")
 
     @visitor(Return)
     def visit(self, node: Return) -> html_tag:
-        return "return " + self.visit(node.values)
+        return span(strong("return "), self.visit(node.values), _class="return")
 
     @visitor(Fornum)
     def visit(self, node: Fornum) -> html_tag:
-        output = " ".join(
-            [
-                "for",
+        return div(
+            header(
+                strong("for "),
                 self.visit(node.target),
-                "=",
-                ", ".join([self.visit(node.start), self.visit(node.stop)]),
-            ]
+                " = ",
+                self.visit(node.start), ", ", self.visit(node.stop)
+            ),
+                span(", ", self.visit(node.step)) if node.step != 1 else "",
+                strong(" do "), 
+                self.visit(node.body)
         )
-        if node.step != 1:
-            output += ", " + self.visit(node.step)
-        output += " do\n" + self.visit(node.body) + "\nend"
-        return output
 
     @visitor(Forin)
     def visit(self, node: Forin) -> html_tag:
-        return (
-            " ".join(
-                ["for", self.visit(node.targets), "in", self.visit(node.iter), "do"]
+        return div(
+            header(strong("for "), self.visit(node.targets), " in ", self.visit(node.iter), " do"),
+            self.visit(node.body)
             )
-            + "\n"
-            + self.visit(node.body)
-            + "\nend"
-        )
 
     @visitor(Call)
     def visit(self, node: Call) -> html_tag:
-        return self.visit(node.func) + "(" + self.visit(node.args) + ")"
+        return span(strong(self.visit(node.func)) , "( ", self.visit(node.args), " )", _class="call")
 
     @visitor(Invoke)
     def visit(self, node: Invoke) -> html_tag:
-        return (
-            self.visit(node.source)
-            + ":"
-            + self.visit(node.func)
-            + "("
-            + self.visit(node.args)
-            + ")"
+        return span(
+            self.visit(node.source),
+            ":",
+            self.visit(node.func),
+            "(",
+            self.visit(node.args),
+            ")"
         )
 
     @visitor(Function)
     def visit(self, node: Function) -> html_tag:
-        return (
-            "function "
-            + self.visit(node.name)
-            + "("
-            + self.visit(node.args)
-            + ")\n"
-            + self.visit(node.body)
-            + "\nend"
-        )
+        return article(
+        		header(strong("function "), self.visit(node.name), "(", self.visit(node.args), ")"),
+        		self.visit(node.body)
+        	)
 
     @visitor(LocalFunction)
     def visit(self, node) -> html_tag:
-        return (
-            "local function "
-            + self.visit(node.name)
-            + "("
-            + self.visit(node.args)
-            + ")\n"
-            + self.visit(node.body)
-            + "\nend"
+        return article(
+        		header(strong("local"),self.visit(node.name), "(", self.visit(node.args), ")"),
+        		self.visit(node.body)
         )
 
     @visitor(Method)
     def visit(self, node: Method) -> html_tag:
-        return (
-            "function "
-            + self.visit(node.source)
-            + ":"
-            + self.visit(node.name)
-            + "("
-            + self.visit(node.args)
-            + ")\n"
-            + self.visit(node.body)
-            + "\nend"
+        return article(
+            header(self.visit(node.source),":", self.visit(node.name), "(", self.visit(node.args), ")" ),
+            self.visit(node.body),
+            _class="method"
         )
 
     @visitor(Nil)
     def visit(self, node) -> html_tag:
-        return "nil"
+        return strong("nil", _class="nil")
 
     @visitor(TrueExpr)
     def visit(self, node) -> html_tag:
-        return span("true", _class='boolean')
+        return strong("true", _class='boolean')
 
     @visitor(FalseExpr)
     def visit(self, node) -> html_tag:
-        return span("false", _class='boolean')
+        return strong("false", _class='boolean')
 
     @visitor(Number)
     def visit(self, node) -> html_tag:
@@ -187,20 +178,16 @@ class HtmlGenerator:
 
     @visitor(Table)
     def visit(self, node: Table):
-        output = "{\n"
-        for field in node.fields:
-            output += indent(self.visit(field) + ",\n", " " * self._indent_size)
-        output += "}"
-        return output
+        return table(
+        	*[self.visit(field) for field in node.fields]
+        )
 
     @visitor(Field)
     def visit(self, node: Field):
-        output = "[" if node.between_brackets else ""
-        output += self.visit(node.key)
-        output += "]" if node.between_brackets else ""
-        output += " = "
-        output += self.visit(node.value)
-        return output
+        return tr(
+		      td("[" if node.between_brackets else "", self.visit(node.key)),
+		      td("]" if node.between_brackets else "", self.visit(node.value)),
+        )
 
     @visitor(Dots)
     def visit(self, node) -> html_tag:
@@ -208,124 +195,124 @@ class HtmlGenerator:
 
     @visitor(AnonymousFunction)
     def visit(self, node: AnonymousFunction) -> html_tag:
-        return (
-            "function("
-            + self.visit(node.args)
-            + ")\n"
-            + self.visit(node.body)
-            + "\nend"
+        return article(
+            "(",
+            self.visit(node.args),
+            ")=>",
+            self.visit(node.body),
+            _class="anonymousfunction"
         )
 
     @visitor(AddOp)
     def visit(self, node) -> html_tag:
-        return self.visit(node.left) + " + " + self.visit(node.right)
+        return span(self.visit(node.left), " + ", self.visit(node.right))
 
     @visitor(SubOp)
     def visit(self, node) -> html_tag:
-        return self.visit(node.left) + " - " + self.visit(node.right)
+        return span(self.visit(node.left), " - ", self.visit(node.right))
 
     @visitor(MultOp)
     def visit(self, node) -> html_tag:
-        return self.visit(node.left) + " * " + self.visit(node.right)
+        return span(self.visit(node.left), " * ", self.visit(node.right))
 
     @visitor(FloatDivOp)
     def visit(self, node) -> html_tag:
-        return self.visit(node.left) + " / " + self.visit(node.right)
+        return span(self.visit(node.left), " / ", self.visit(node.right))
 
     @visitor(FloorDivOp)
     def visit(self, node) -> html_tag:
-        return self.visit(node.left) + " // " + self.visit(node.right)
+        return span(self.visit(node.left), " // ", self.visit(node.right))
 
     @visitor(ModOp)
     def visit(self, node) -> html_tag:
-        return self.visit(node.left) + " % " + self.visit(node.right)
+        return span(self.visit(node.left), " % ", self.visit(node.right))
 
     @visitor(ExpoOp)
     def visit(self, node) -> html_tag:
-        return self.visit(node.left) + " ^ " + self.visit(node.right)
+        return span(self.visit(node.left), " ^ ", self.visit(node.right))
 
     @visitor(BAndOp)
     def visit(self, node) -> html_tag:
-        return self.visit(node.left) + " & " + self.visit(node.right)
+        return span(self.visit(node.left), " & ", self.visit(node.right))
 
     @visitor(BOrOp)
     def visit(self, node) -> html_tag:
-        return self.visit(node.left) + " | " + self.visit(node.right)
+        return span(self.visit(node.left), " | ", self.visit(node.right))
 
     @visitor(BXorOp)
     def visit(self, node) -> html_tag:
-        return self.visit(node.left) + " ~ " + self.visit(node.right)
+        return span(self.visit(node.left), " ~ ", self.visit(node.right))
 
     @visitor(BShiftROp)
     def visit(self, node) -> html_tag:
-        return self.visit(node.left) + " >> " + self.visit(node.right)
+        return span(self.visit(node.left), " >> ", self.visit(node.right))
 
     @visitor(BShiftLOp)
     def visit(self, node) -> html_tag:
-        return self.visit(node.left) + " << " + self.visit(node.right)
+        return span(self.visit(node.left), " << ", self.visit(node.right), _class="BShiftLOp")
 
     @visitor(LessThanOp)
     def visit(self, node) -> html_tag:
-        return self.visit(node.left) + " < " + self.visit(node.right)
+        return span(self.visit(node.left), " < ", self.visit(node.right), _class="LessThanOp")
 
     @visitor(GreaterThanOp)
     def visit(self, node) -> html_tag:
-        return self.visit(node.left) + " > " + self.visit(node.right)
+        return span(self.visit(node.left), " > ", self.visit(node.right), _class="LessOrEqThanOp")
 
     @visitor(LessOrEqThanOp)
     def visit(self, node) -> html_tag:
-        return self.visit(node.left) + " <= " + self.visit(node.right)
+        return span(self.visit(node.left), " <= ", self.visit(node.right), _class="LessOrEqThan")
 
     @visitor(GreaterOrEqThanOp)
     def visit(self, node) -> html_tag:
-        return self.visit(node.left) + " >= " + self.visit(node.right)
+        return span(self.visit(node.left), " >= ", self.visit(node.right), _class="greaterOrEqThan")
 
     @visitor(EqToOp)
     def visit(self, node) -> html_tag:
-        return self.visit(node.left) + " == " + self.visit(node.right)
+        return span(self.visit(node.left), " == ", self.visit(node.right), _class="eqTo")
 
     @visitor(NotEqToOp)
     def visit(self, node) -> html_tag:
-        return self.visit(node.left) + " ~= " + self.visit(node.right)
+        return span(self.visit(node.left), " ~= ", self.visit(node.right), _class="notEq")
 
     @visitor(AndLoOp)
     def visit(self, node) -> html_tag:
-        return self.visit(node.left) + " and " + self.visit(node.right)
+        return span(self.visit(node.left), " and ", self.visit(node.right), _class="and")
 
     @visitor(OrLoOp)
     def visit(self, node) -> html_tag:
-        return self.visit(node.left) + " or " + self.visit(node.right)
+        return span(self.visit(node.left), " or ", self.visit(node.right), _class="or")
 
     @visitor(Concat)
     def visit(self, node) -> html_tag:
-        return self.visit(node.left) + ".." + self.visit(node.right)
+        return span(self.visit(node.left), "..", self.visit(node.right), _class="concat")
 
     @visitor(UMinusOp)
     def visit(self, node) -> html_tag:
-        return "-" + self.visit(node.operand)
+        return span("-", self.visit(node.operand), _class="minus")
 
     @visitor(UBNotOp)
     def visit(self, node) -> html_tag:
-        return "~" + self.visit(node.operand)
+        return span("~", self.visit(node.operand), _class="not")
 
     @visitor(ULNotOp)
     def visit(self, node) -> html_tag:
-        return "not " + self.visit(node.operand)
+        return span(strong("not "), self.visit(node.operand), _class="not")
 
     @visitor(ULengthOP)
     def visit(self, node) -> html_tag:
-        return "#" + self.visit(node.operand)
+        return span("#", self.visit(node.operand), _class="length")
 
     @visitor(Name)
     def visit(self, node: Name) -> html_tag:
-        return span(str(node.id), _class='name')
+        return var(str(node.id), _contenteditable="true")
 
     @visitor(Index)
     def visit(self, node: Index) -> html_tag:
         if node.notation == IndexNotation.DOT:
-            return self.visit(node.value) + "." + self.visit(node.idx)
+            return span(self.visit(node.value), ".", self.visit(node.idx))
         else:
-            return self.visit(node.value) + "[" + self.visit(node.idx) + "]"
+            return span(self.visit(node.value), "[", self.visit(node.idx), "]")
 
     @visitor(Varargs)
     def visit(self, node) -> html_tag:
@@ -333,7 +320,11 @@ class HtmlGenerator:
 
     @visitor(Repeat)
     def visit(self, node: Repeat) -> html_tag:
-        return "repeat\n" + self.visit(node.body) + "\nuntil " + self.visit(node.test)
+        return div(
+            strong("repeat"), 
+        	self.visit(node.body),
+        	header(strong("until ") , self.visit(node.test))
+        	)
 
     @visitor(SemiColon)
     def visit(self, node) -> html_tag:
@@ -354,7 +345,7 @@ class HtmlGenerator:
 
     @visitor(list)
     def visit(self, node: List) -> html_tag:
-        return div(*[self.visit(n) for n in node], _clas='list')
+        return ol(*[li(self.visit(n)) for n in node], _class='list')
 
     @visitor(type(None))
     def visit(self, node) -> str:
